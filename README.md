@@ -1,2 +1,4 @@
-# Co-worker
-Co-worker is a multi agent system.
+# MultA
+MultA is a multi agent system. 
+
+
