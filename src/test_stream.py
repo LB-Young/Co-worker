@@ -13,7 +13,10 @@ async def main():
     poetry_review = Agent("poetry_review", client, "deepseek-chat", "你是一个古诗专家，可以评价古诗词，并给出详细的评价。", ["poetry_review"])
     query = "我在中国上海出差，请查询今天的天气后，然后写一首与今天天气有关的诗要有诗名，并评论一下这首诗写的好不好。"
     multa = MultA(model="deepseek-chat", client=client)
-    await multa.run(query=query, agents=[write_poetry, poetry_review], tools=[get_weather])
-
+    response = multa._execute_plan(query=query, agents=[write_poetry, poetry_review], tools=[get_weather])
+    async for item in response:
+        print(item, end="")
+        # pass
+        
 if __name__ == "__main__":
     asyncio.run(main())

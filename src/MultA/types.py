@@ -10,27 +10,42 @@ class Agent:
         self.functions = functions
 
     async def run(self, prompt, messages, tools):
-        cur_message = {'role': 'user', 'content': f"经过团队分析，当前步骤为：“{prompt}”应该由你来解答，请按照要求的json结构给出你对这个步骤的回答，请保持与上文的连贯性。"}
+        title = ""
+        cur_result = ""
+        query_state = ""
+        cur_message = {'role': 'user', 'content': "经过团队分析，当前步骤需要处理的内容：“" + f"{prompt}" + """”应该由你来解答。结果以json形式返回。如：      
+            {
+                "step_result": "这段内容的摘要是：……",
+                "step_title": "对内容做摘要",
+                "query_state": "continue/finished"
+            }
+        其中step_result为当前步骤处理后的结果，step_title为给当前步骤起的标题，query_state为当前查询处理的状态，finished表示当前步骤是解决用户任务的最后一个步骤，continue表示当前步骤执行完毕后还需要采取后续的步骤继续处理。"""}
         cur_response = self.client.chat.completions.create(
             model=self.model,
             messages=messages + [cur_message],
         )
         response = json.loads(cur_response.choices[0].message.content.replace("```json\n", "").replace("\n```",""))
-        title = response['title']
-        cur_result = response['content']
+        title = response['step_title']
+        cur_result = response['step_result']
         query_state = response['query_state']
 
         if query_state == "finished":
             next_agent_name = None
             next_agent_params = None
         else:
-            next_agent_name, next_agent_params, title, query_state = await self.get_next_Agent(messages, tools, cur_result)
+            next_agent_name, next_agent_params, title, query_state = await self.get_next_Agent(messages, tools, title + ":" +cur_result)
 
         return cur_result, next_agent_name, next_agent_params, title, query_state
 
     async def get_next_Agent(self, messages, tools, cur_result):
-        if len(messages) > 3:
-            cur_message = {"role": "user", "content": "请接着上一个回答的的内容，继续分析下一个小步骤应该干什么。"}
+        if cur_result is not None:
+            cur_message = {"role": "user", "content": """如果你是当前任务的负责人，需要解决用户的问题，这个问题其它人已经处理了一些步骤，请在这些步骤的基础上确定下一步骤应该由谁来负责。结果以json形式返回。如：      
+            {
+                "step_content": "搜索与多模态大模型相关的论文",
+                "step_title": "相关内容检索",
+                "query_state": "continue/finished"
+            }
+        其中step_content为当前步骤需要处理的任务，step_title为给当前步骤起的标题，query_state为当前查询处理的状态，finished表示当前步骤是解决用户任务的最后一个步骤，continue表示当前步骤执行完毕后还需要采取后续的步骤继续处理。"""}
             response = self.client.chat.completions.create(
                 tools=tools,
                 model=self.model,
@@ -40,13 +55,13 @@ class Agent:
             response = self.client.chat.completions.create(
                 tools=tools,
                 model=self.model,
-                messages=messages + [{"role": "assistant", "content": cur_result}],
+                messages=messages,
             )
         time = 0
         while time <= 3 and response.choices[0].message.tool_calls is None:
             response = json.loads(response.choices[0].message.content.replace("```json\n", "").replace("\n```",""))
-            title = response['title']
-            next_agent_content = response['content']
+            title = response['step_title']
+            next_agent_content = response['step_content']
             query_state = response['query_state']
             response = self.client.chat.completions.create(
                 tools=tools,
