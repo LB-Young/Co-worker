@@ -1,6 +1,8 @@
 import streamlit as st
 import requests
 import json
+import time
+from sseclient import SSEClient
 
 st.set_page_config(page_title="MultA Chat", page_icon="🤖", layout="wide")
 
@@ -72,6 +74,15 @@ if "input_key" not in st.session_state:
 # 创建主容器
 main_container = st.container()
 
+# 显示聊天历史
+with main_container:
+    for message in st.session_state.messages:
+        with st.chat_message(
+            message["role"],
+            avatar="🧑‍💻" if message["role"] == "user" else "🤖"
+        ):
+            st.markdown(message["content"], unsafe_allow_html=True)
+
 # 创建底部输入区域
 input_container = st.container()
 with input_container:
@@ -87,21 +98,27 @@ with input_container:
     with col2:
         send_button = st.button("发送", use_container_width=True)
 
-# 显示聊天历史
-with main_container:
-    for message in st.session_state.messages:
-        with st.chat_message(
-            message["role"],
-            avatar="🧑‍💻" if message["role"] == "user" else "🤖"
-        ):
-            st.markdown(message["content"], unsafe_allow_html=True)
-
 if send_button and user_input:
-    # 添加用户消息
-    st.session_state.messages.append({"role": "user", "content": user_input})
+    # 保存当前输入
+    current_message = user_input
+    
+    # 更新input_key来清空输入框
+    st.session_state.input_key += 1
+    
+    # 添加用户消息并立即显示
+    st.session_state.messages.append({"role": "user", "content": current_message})
+    
+    # 重新显示所有消息，包括新的用户消息
+    with main_container:
+        for message in st.session_state.messages:
+            with st.chat_message(
+                message["role"],
+                avatar="🧑‍💻" if message["role"] == "user" else "🤖"
+            ):
+                st.markdown(message["content"], unsafe_allow_html=True)
     
     try:
-        # 创建消息占位符
+        # 创建assistant消息占位符
         with st.chat_message("assistant", avatar="🤖"):
             message_placeholder = st.empty()
             full_response = ""
@@ -109,50 +126,32 @@ if send_button and user_input:
             # 发送请求到后端
             with requests.post(
                 "http://localhost:8000/chat",
-                json={"query": user_input},
+                json={"query": current_message},
                 stream=True,
                 headers={'Accept': 'text/event-stream'}
             ) as response:
-                
-                # 流式处理响应
-                buffer = ""
-                finished_flag = False
-                for chunk in response.iter_content(chunk_size=1024):
-                    print("chunk:", chunk)
-                    if chunk:
-                        buffer += chunk.decode()
-                        while '\n\n' in buffer:
-                            print("buffer:", buffer)
-                            line, buffer = buffer.split('\n\n', 1)
-                            print("line:", line, "\tbuffer:", buffer)
-                            if line.startswith('data: '):
-                                if line.strip() == 'data: [DONE]':
-                                    finished_flag = True
-                                    break
-                                try:
-                                    data = json.loads(line[6:])
-                                    if 'error' in data:
-                                        st.error(f"Error: {data['error']}")
-                                        break
-                                    new_content = data.get('content', '')
-                                    if new_content == "done!":
-                                        break
-                                    full_response += new_content
-                                    print("full_response:", full_response)
-                                    message_placeholder.markdown(full_response + "▌")
-                                except json.JSONDecodeError:
-                                    continue
-                    if finished_flag:
-                        break
+                try:
+                    client = SSEClient(response)
+                    # 流式处理响应
+                    for event in client.events():
+                        if event.data == "[DONE]":
+                            break
+                        full_response += event.data
+                        print("full_response:", full_response)
+                        message_placeholder.markdown(full_response + "▌")
+                except Exception as e:
+                    print(f"Error: {str(e)}")
+                finally:
+                    # 确保连接关闭
+                    response.close()
+            print("请求完成!")
             # 完成后移除光标并更新最终内容
-            if len(full_response) != 0:
+            if full_response:
                 message_placeholder.markdown(full_response)
                 # 添加到消息历史
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
-        
-        # 更新input_key来清空输入框
-        st.session_state.input_key += 1
-        
+            print("请求完成!!")
+            
     except Exception as e:
         st.error(f"连接错误: {str(e)}")
         print(f"Error details: {str(e)}")
@@ -160,3 +159,4 @@ if send_button and user_input:
 # 保持聊天记录显示在最新位置
 if st.session_state.messages:
     st.rerun()
+    

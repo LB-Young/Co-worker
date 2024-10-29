@@ -33,14 +33,14 @@ async def stream_generator(query: str):
             if chunk:  # 确保chunk不为空
                 print("chunk:", list(chunk))
                 if chunk.strip() == "done!":
-                    yield "data: [DONE]\n\n"
+                    yield "data: [DONE]"
                 else:
-                    yield f"data: {json.dumps({'content': chunk})}\n\n"
+                    yield f"data: {chunk}"
         # 发送结束信号
-        yield "data: [DONE]\n\n"
+        yield "data: [DONE]"
     except Exception as e:
         print(f"Stream generation error: {str(e)}")
-        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        yield f"{json.dumps({'error': str(e)})}"
 
 @app.post("/chat")
 async def chat(request: Request):
@@ -48,8 +48,17 @@ async def chat(request: Request):
     query = data.get("query", "")
     return StreamingResponse(
         stream_generator(query),
-        media_type="text/event-stream"
+        media_type="text/event-stream",
+        headers={       
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            }
     )
+    # async for chunk in stream_generator(query):
+    #     yield StreamingResponse(
+    #         chunk,
+    #         media_type="text/event-stream"
+    #     )
 
 if __name__ == "__main__":
     import uvicorn

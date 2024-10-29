@@ -136,9 +136,6 @@ class MultA:
     async def _execute_plan(self, query: str, agents=None, tools=None) -> AsyncGenerator[str, None]:
         async for item in self.run(query=query, agents=agents, tools=tools):
             if item != "done!":
-                for char in item:
-                    yield char
-                yield "\n"
-                yield "\n"
+                yield item + "\n\n"
             else:
                 yield item
