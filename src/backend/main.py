@@ -31,7 +31,11 @@ async def stream_generator(query: str):
     try:
         async for chunk in multa._execute_plan(query, agents=[write_poetry, poetry_review], tools=[get_weather]):
             if chunk:  # 确保chunk不为空
-                yield f"data: {json.dumps({'content': chunk})}\n\n"
+                print("chunk:", list(chunk))
+                if chunk.strip() == "done!":
+                    yield "data: [DONE]\n\n"
+                else:
+                    yield f"data: {json.dumps({'content': chunk})}\n\n"
         # 发送结束信号
         yield "data: [DONE]\n\n"
     except Exception as e:

@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import json
-import markdown
 
 st.set_page_config(page_title="MultA Chat", page_icon="🤖", layout="wide")
 
@@ -78,7 +77,6 @@ input_container = st.container()
 with input_container:
     col1, col2 = st.columns([10, 1])
     with col1:
-        # 使用动态key来强制重新创建输入框
         user_input = st.text_area(
             "输入您的问题：",
             key=f"user_input_{st.session_state.input_key}",
@@ -109,43 +107,55 @@ if send_button and user_input:
             full_response = ""
             
             # 发送请求到后端
-            response = requests.post(
+            with requests.post(
                 "http://localhost:8000/chat",
                 json={"query": user_input},
                 stream=True,
                 headers={'Accept': 'text/event-stream'}
-            )
-            
-            # 流式处理响应
-            for line in response.iter_lines():
-                if line:
-                    line = line.decode('utf-8')
-                    if line.startswith('data: '):
-                        if line.strip() == 'data: [DONE]':
-                            break
-                        try:
-                            data = json.loads(line[6:])
-                            if 'error' in data:
-                                st.error(f"Error: {data['error']}")
-                                break
-                            new_content = data.get('content', '')
-                            full_response += new_content
-                            # 使用占位符更新内容
-                            message_placeholder.markdown(full_response + "▌")
-                        except json.JSONDecodeError:
-                            continue
-            
+            ) as response:
+                
+                # 流式处理响应
+                buffer = ""
+                finished_flag = False
+                for chunk in response.iter_content(chunk_size=1024):
+                    print("chunk:", chunk)
+                    if chunk:
+                        buffer += chunk.decode()
+                        while '\n\n' in buffer:
+                            print("buffer:", buffer)
+                            line, buffer = buffer.split('\n\n', 1)
+                            print("line:", line, "\tbuffer:", buffer)
+                            if line.startswith('data: '):
+                                if line.strip() == 'data: [DONE]':
+                                    finished_flag = True
+                                    break
+                                try:
+                                    data = json.loads(line[6:])
+                                    if 'error' in data:
+                                        st.error(f"Error: {data['error']}")
+                                        break
+                                    new_content = data.get('content', '')
+                                    if new_content == "done!":
+                                        break
+                                    full_response += new_content
+                                    print("full_response:", full_response)
+                                    message_placeholder.markdown(full_response + "▌")
+                                except json.JSONDecodeError:
+                                    continue
+                    if finished_flag:
+                        break
             # 完成后移除光标并更新最终内容
-            message_placeholder.markdown(full_response)
-        
-        # 添加到消息历史
-        st.session_state.messages.append({"role": "assistant", "content": full_response})
+            if len(full_response) != 0:
+                message_placeholder.markdown(full_response)
+                # 添加到消息历史
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
         
         # 更新input_key来清空输入框
         st.session_state.input_key += 1
         
     except Exception as e:
         st.error(f"连接错误: {str(e)}")
+        print(f"Error details: {str(e)}")
 
 # 保持聊天记录显示在最新位置
 if st.session_state.messages:
