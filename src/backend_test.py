@@ -3,6 +3,8 @@ import json
 from sseclient import SSEClient
 
 user_input = "我在中国上海出差，请查询今天的天气后，然后写一首与今天天气有关的诗要有诗名，并评论一下这首诗写的好不好。"
+# user_input = "首先查询一下上海的天气，然后再查询一下华盛顿的天气。"
+# user_input = "写一首与晴天有关的诗要有诗名，并评论一下这首诗写的好不好。"
 buffer = ""
 finished_flag = False
 full_response = ""
@@ -22,7 +24,8 @@ try:
     for event in client.events():
         if event.data == "[DONE]":
             break
-        print(f"收到消息: {event.data}")
+        data = event.data.replace("\\n","\n")
+        print(f"收到消息: {data}")
 except Exception as e:
     print(f"Error: {str(e)}")
 finally:

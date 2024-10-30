@@ -1,4 +1,4 @@
-def get_weather(location=None, get_tool_format=False):
+async def get_weather(location=None, get_tool_format=False):
     """
     This function returns the current weather in the city of Paris.
     """

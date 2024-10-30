@@ -4,7 +4,8 @@ from fastapi.responses import StreamingResponse
 from MultA.MultA import MultA
 from MultA.types import Agent
 from MultA.tools.get_weather import get_weather
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
+# from MultA.async_llm import AsyncOpenAI
 import json
 import asyncio
 
@@ -20,7 +21,7 @@ app.add_middleware(
 )
 
 async def stream_generator(query: str):
-    client = OpenAI(
+    client = AsyncOpenAI(
         api_key="sk-bbbb062c55f24dd5928f4c4448c37f1f",
         base_url="https://api.deepseek.com",
     )
@@ -31,13 +32,14 @@ async def stream_generator(query: str):
     try:
         async for chunk in multa._execute_plan(query, agents=[write_poetry, poetry_review], tools=[get_weather]):
             if chunk:  # 确保chunk不为空
-                print("chunk:", list(chunk))
+                print("chunk:", chunk)
                 if chunk.strip() == "done!":
-                    yield "data: [DONE]"
+                    yield "data: [DONE]\n\n"
                 else:
-                    yield f"data: {chunk}"
+                    chunk = chunk.replace("\n","\\n")
+                    yield f"data: {chunk}\n\n"
         # 发送结束信号
-        yield "data: [DONE]"
+        # yield "data: [DONE]"
     except Exception as e:
         print(f"Stream generation error: {str(e)}")
         yield f"{json.dumps({'error': str(e)})}"

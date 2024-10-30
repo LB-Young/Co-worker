@@ -1,15 +1,22 @@
 import json
 import asyncio
-from openai import OpenAI
+import openai
+from openai import OpenAI, AsyncOpenAI
 from .types import Agent
 from typing import AsyncGenerator, List, Dict
+# from .async_llm import AsyncOpenAI
+
 
 class MultA:
-    def __init__(self, model=None, client=None):
+    def __init__(self, api_key=None, base_url=None, model=None, client=None):
+        if not isinstance(client, openai.OpenAI):
+            self.client_flag = "async"
+        else:
+            self.client_flag = "no_async"
         if client is not None:
             self.client = client
         else:
-            self.client = OpenAI()
+            self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         if model is None:
             self.model = "gpt-3.5-turbo"
         else:
@@ -45,7 +52,7 @@ class MultA:
                 tool_name = tool.__name__.split(".")[-1]
                 self.agent_function_mapping[tool_name] = {"type":"function",
                                                            "object":tool}
-                tool_format = tool(get_tool_format=True)
+                tool_format = await tool(get_tool_format=True)
                 self.tools.append(tool_format)
 
     async def run(self, query: str, agents=None, tools=None) -> AsyncGenerator[str, None]:
@@ -59,8 +66,11 @@ class MultA:
             }
             ]
         if agents is None:
-            result = self.client.chat.completions.create(messages=messages)
-            yield result.choices[0].message.content
+            if self.client_flag == "async":
+                result = await self.client.chat.completions.create(messages=messages)
+            else:
+                result = self.client.chat.completions.create(messages=messages)
+                yield result.choices[0].message.content
         else:
             next_agent = None
             next_agent_name, next_agent_params, title, query_state = await self.choose_next_agent(messages)
@@ -68,39 +78,55 @@ class MultA:
             next_type = self.agent_function_mapping[next_agent_name]['type']
             times = 0
             while times < 5 and next_agent is not None:
-                print("title:", title)
-                yield f"#### step {times+1}:" + title
+                yield f"#### step {times+1}: {title}\n\n"
+                await asyncio.sleep(0.1)
+
                 if next_type == "agent":
-                    cur_result, next_agent_name, next_agent_params, title, query_state = await next_agent.run(prompt=next_agent_params['prompt'], messages=messages, tools=self.tools)
+                    cur_result, next_agent_name, next_agent_params, title, query_state = await next_agent.run(
+                        prompt=next_agent_params['prompt'], 
+                        messages=messages, 
+                        tools=self.tools
+                    )
                     if len(cur_result) == 0:
                         break
                     messages.append({"role": "assistant", "content": title + ":" + cur_result})
-                    print("agent cur_result:", cur_result)
-                    yield cur_result.replace("\n", "\n\n").replace("\n\n\n\n", "\n\n")
+                    print("cur_result:", cur_result)
+                    yield cur_result.replace("\n", "\n\n").replace("\n\n\n\n", "\n\n") + "\n\n"
+                    await asyncio.sleep(0.1)
+                    
                     times += 1
                     if query_state == "finished":
                         break
                     next_agent = self.agent_function_mapping[next_agent_name]['object']
                     next_type = self.agent_function_mapping[next_agent_name]['type']
                 else:
-                    tool_result = next_agent(**next_agent_params)
+                    tool_result = await next_agent(**next_agent_params)
                     cur_message = {"role": "user", "content": f"assistant调用的tool {next_agent_name} 的返回结果为 {tool_result}。请将结果重新用自然语言组织表述，不要回复其它内容。"}
-                    response = self.client.chat.completions.create(
-                                                                    tools=self.tools,
-                                                                    model=self.model,
-                                                                    messages=messages + [cur_message]  
-                                                                )
-                    # response = json.loads(response.choices[0].message.content.replace("```json\n", "").replace("\n```",""))
+                    if self.client_flag == "async":
+                        response = await self.client.chat.completions.create(
+                            tools=self.tools,
+                            model=self.model,
+                            messages=messages + [cur_message]  
+                        )
+                    else:
+                        response = self.client.chat.completions.create(
+                            tools=self.tools,
+                            model=self.model,
+                            messages=messages + [cur_message]  
+                        )   
                     cur_result = response.choices[0].message.content
                     messages.append({"role": "assistant", "content": title + ":" + cur_result})
-                    print("tool cur_result:", cur_result)
-                    yield cur_result.replace("\n", "\n\n").replace("\n\n\n\n", "\n\n")
+                    print("cur_result:", cur_result)
+                    yield cur_result.replace("\n", "\n\n").replace("\n\n\n\n", "\n\n") + "\n\n"
+                    await asyncio.sleep(0.1)
+                    
                     times += 1
                     if query_state == "finished":
                         break
                     next_agent_name, next_agent_params, title, query_state = await self.choose_next_agent(messages)
                     next_agent = self.agent_function_mapping[next_agent_name]['object']
                     next_type = self.agent_function_mapping[next_agent_name]['type']
+            
             yield "done!"
 
     async def choose_next_agent(self, messages):
@@ -111,23 +137,41 @@ class MultA:
                 "query_state": "continue/finished"
             }
         其中step_content为当前步骤需要处理的任务，step_title为给当前步骤起的标题，query_state为当前查询处理的状态，finished表示当前步骤是解决用户任务的最后一个步骤，continue表示当前步骤执行完毕后还需要采取后续的步骤继续处理。"""}
-        response = self.client.chat.completions.create(
-            tools=self.tools,
-            model=self.model,
-            messages=messages + [cur_message],
-        )
+
+        if self.client_flag == "async":
+            response = await self.client.chat.completions.create(
+                tools=self.tools,
+                model=self.model,
+                messages=messages + [cur_message],
+            )
+        else:
+            response = self.client.chat.completions.create(
+                tools=self.tools,
+                model=self.model,
+                messages=messages + [cur_message],
+            )
+
         time = 0
         while time <= 3 and response.choices[0].message.tool_calls is None:
             response = json.loads(response.choices[0].message.content.replace("```json\n", "").replace("\n```",""))
             title = response['step_title']
             next_agent_content = response['step_content']
             query_state = response['query_state']
-            response = self.client.chat.completions.create(
-                tools=self.tools,
-                model=self.model,
-                messages=messages[3:]+[{"role": "user", "content": next_agent_content}],
-                tool_choice = "required"
-            )
+
+            if self.client_flag == "async":
+                response = await self.client.chat.completions.create(
+                    tools=self.tools,
+                    model=self.model,
+                    messages=messages[3:]+[{"role": "user", "content": next_agent_content}],
+                    tool_choice = "required"
+                )
+            else:
+                response = self.client.chat.completions.create(
+                    tools=self.tools,
+                    model=self.model,
+                    messages=messages[3:]+[{"role": "user", "content": next_agent_content}],
+                    tool_choice = "required"
+                )
             time += 1
         next_agent_name = response.choices[0].message.tool_calls[0].function.name
         next_agent_params = json.loads(response.choices[0].message.tool_calls[0].function.arguments)
@@ -136,6 +180,6 @@ class MultA:
     async def _execute_plan(self, query: str, agents=None, tools=None) -> AsyncGenerator[str, None]:
         async for item in self.run(query=query, agents=agents, tools=tools):
             if item != "done!":
-                yield item + "\n\n"
+                yield item
             else:
                 yield item

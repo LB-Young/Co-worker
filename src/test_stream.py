@@ -2,10 +2,15 @@ import asyncio
 from MultA.MultA import MultA
 from MultA.types import Agent, Response
 from openai import OpenAI
+from MultA.async_llm import AsyncOpenAI
 from MultA.tools.get_weather import get_weather
 
 async def main():
-    client = OpenAI(
+    a = OpenAI(                        api_key="sk-bbbb062c55f24dd5928f4c4448c37f1f",
+                        base_url="https://api.deepseek.com",)
+    print(type(a))
+    breakpoint()
+    client = AsyncOpenAI(
                         api_key="sk-bbbb062c55f24dd5928f4c4448c37f1f",
                         base_url="https://api.deepseek.com",
                     )

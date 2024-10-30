@@ -71,17 +71,20 @@ if "messages" not in st.session_state:
 if "input_key" not in st.session_state:
     st.session_state.input_key = 0
 
+if "processing" not in st.session_state:
+    st.session_state.processing = False
+
 # 创建主容器
 main_container = st.container()
 
 # 显示聊天历史
 with main_container:
     for message in st.session_state.messages:
-        with st.chat_message(
-            message["role"],
-            avatar="🧑‍💻" if message["role"] == "user" else "🤖"
-        ):
-            st.markdown(message["content"], unsafe_allow_html=True)
+        if message["role"] == "user":
+            avatar = "🧑‍💻"
+        else:
+            avatar = "🤖"
+        st.chat_message(message["role"], avatar=avatar).markdown(message["content"], unsafe_allow_html=True)
 
 # 创建底部输入区域
 input_container = st.container()
@@ -98,25 +101,23 @@ with input_container:
     with col2:
         send_button = st.button("发送", use_container_width=True)
 
-if send_button and user_input:
+# 发送按钮事件
+if send_button and user_input and not st.session_state.processing:
+    st.session_state.processing = True
+    
     # 保存当前输入
     current_message = user_input
     
     # 更新input_key来清空输入框
     st.session_state.input_key += 1
     
-    # 添加用户消息并立即显示
+    # 添加用户消息到历史记录
     st.session_state.messages.append({"role": "user", "content": current_message})
     
-    # 重新显示所有消息，包括新的用户消息
-    with main_container:
-        for message in st.session_state.messages:
-            with st.chat_message(
-                message["role"],
-                avatar="🧑‍💻" if message["role"] == "user" else "🤖"
-            ):
-                st.markdown(message["content"], unsafe_allow_html=True)
-    
+    # 仅显示新添加的用户消息，而不重新渲染整个历史记录
+    st.chat_message("user", avatar="🧑‍💻").markdown(current_message, unsafe_allow_html=True)
+
+    # 获取助手响应
     try:
         # 创建assistant消息占位符
         with st.chat_message("assistant", avatar="🤖"):
@@ -136,27 +137,22 @@ if send_button and user_input:
                     for event in client.events():
                         if event.data == "[DONE]":
                             break
-                        full_response += event.data
-                        print("full_response:", full_response)
+                        full_response += event.data.replace("\\n","\n")
                         message_placeholder.markdown(full_response + "▌")
                 except Exception as e:
-                    print(f"Error: {str(e)}")
+                    st.error(f"流式处理错误: {str(e)}")
                 finally:
                     # 确保连接关闭
                     response.close()
-            print("请求完成!")
+            
             # 完成后移除光标并更新最终内容
             if full_response:
                 message_placeholder.markdown(full_response)
-                # 添加到消息历史
+                # 添加助手的响应到消息历史
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
-            print("请求完成!!")
             
     except Exception as e:
         st.error(f"连接错误: {str(e)}")
-        print(f"Error details: {str(e)}")
-
-# 保持聊天记录显示在最新位置
-if st.session_state.messages:
-    st.rerun()
     
+    st.session_state.processing = False
+    st.rerun()
