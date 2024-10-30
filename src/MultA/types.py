@@ -5,7 +5,7 @@ from openai import AsyncOpenAI
 
 
 class Agent:
-    def __init__(self, name, client, model, description, functions):
+    def __init__(self, name, client, model, description, role, functions):
         if not isinstance(client, openai.OpenAI):
             self.client_flag = "async"
         else:
@@ -14,13 +14,14 @@ class Agent:
         self.client = client
         self.model = model
         self.description = description
+        self.role = role
         self.functions = functions
 
     async def run(self, prompt, messages, tools):
         title = ""
         cur_result = ""
         query_state = ""
-        cur_message = {'role': 'user', 'content': "经过团队分析，当前步骤需要处理的内容：“" + f"{prompt}" + """”应该由你来解答。结果以json形式返回。如：      
+        cur_message = {'role': 'user', 'content': f"{self.role}\n\n经过团队分析，当前步骤需要处理的内容：“" + f"{prompt}" + """”应该由你来解答。结果以json形式返回。如：      
             {
                 "step_result": "这段内容的摘要是：……",
                 "step_title": "对内容做摘要",
