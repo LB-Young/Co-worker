@@ -134,6 +134,8 @@ async def main():
                     try:
                         client = SSEClient(response)
                         # 流式处理响应
+                        tmp_response = full_response + "[正在思考第一步...]"
+                        message_placeholder.markdown(tmp_response + "▌")
                         for event in client.events():
                             if event.data == "[DONE]":
                                 break
@@ -141,7 +143,15 @@ async def main():
                             for data in cur_response_data:
                                 full_response += data
                                 message_placeholder.markdown(full_response + "▌")
-                                await asyncio.sleep(0.03)
+                                await asyncio.sleep(0.05)
+                            if not cur_response_data.strip().startswith("#### step"):
+                                tmp_response = full_response + "[正在思考下一步...]"
+                                message_placeholder.markdown(tmp_response + "▌")
+                                await asyncio.sleep(2)
+                            else:
+                                tmp_response = full_response + "[正在处理当前步骤...]"
+                                message_placeholder.markdown(tmp_response + "▌")
+                                await asyncio.sleep(3)
                     except Exception as e:
                         st.error(f"流式处理错误: {str(e)}")
                     finally:
