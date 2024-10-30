@@ -77,10 +77,21 @@ class MultA:
             next_agent = self.agent_function_mapping[next_agent_name]['object']
             next_type = self.agent_function_mapping[next_agent_name]['type']
             times = 0
+            past_title_set = set("")
+            query_set = set(query)
             while times < 5 and next_agent is not None:
-                yield f"#### step {times+1}: {title}\n\n"
+                title_set = set(title)
+                print("past_title_set", past_title_set)
+                print("query_set", query_set)
+                print("title_set", title_set)
+                print(len(title_set & past_title_set),  len(title_set & query_set), len(title_set))
+                if len(title_set & past_title_set) / len(title_set) >= 0.8:
+                    break
+                if len(title_set & query_set) / len(title_set) <= 0.5:
+                    break
+                past_title_set = title_set
+                yield f"#### step {times+1}: {title}({next_agent_name})\n\n"
                 await asyncio.sleep(0.1)
-
                 if next_type == "agent":
                     cur_result, next_agent_name, next_agent_params, title, query_state = await next_agent.run(
                         prompt=next_agent_params['prompt'], 
@@ -136,7 +147,12 @@ class MultA:
                 "step_title": "相关内容检索",
                 "query_state": "continue/finished"
             }
-        其中step_content为当前步骤需要处理的任务，step_title为给当前步骤起的标题，query_state为当前查询处理的状态，finished表示当前步骤是解决用户任务的最后一个步骤，continue表示当前步骤执行完毕后还需要采取后续的步骤继续处理。"""}
+        其中step_content为当前步骤需要处理的任务，step_title为给当前步骤起的标题，query_state为当前查询处理的状态，finished表示当前步骤是解决用户任务的最后一个步骤，continue表示当前步骤执行完毕后还需要采取后续的步骤继续处理。
+        约束：
+        1. 步骤切分要足够的小，这个小步骤仅由团队中的一个人或一个工具解决，不能是需要多人协作或者多个工具才能解决的步骤。如：“写一篇博客并发表到小红书”需要拆分成“写一篇博客”和“发表到小红书”两个步骤。 
+        2. 每个步骤都需要来自用户的初始问题，不需要自行扩展。如：“写一篇博客并发表到小红书”可以拆分成“写一篇博客”和“发表到小红书”两个步骤，一定不要涉及用户query之外的步骤。
+        3. 每个任务都是从用户query中解析得到，不能是捏造的任务。
+        4. 注意LLM本身的幻觉，不要生成用户问题之外的步骤。"""}
 
         if self.client_flag == "async":
             response = await self.client.chat.completions.create(

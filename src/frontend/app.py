@@ -147,11 +147,11 @@ async def main():
                             if not cur_response_data.strip().startswith("#### step"):
                                 tmp_response = full_response + "[正在思考下一步...]"
                                 message_placeholder.markdown(tmp_response + "▌")
-                                await asyncio.sleep(2)
+                                await asyncio.sleep(1)
                             else:
                                 tmp_response = full_response + "[正在处理当前步骤...]"
                                 message_placeholder.markdown(tmp_response + "▌")
-                                await asyncio.sleep(3)
+                                await asyncio.sleep(2)
                     except Exception as e:
                         st.error(f"流式处理错误: {str(e)}")
                     finally:
