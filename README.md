@@ -2,22 +2,6 @@
 
 MultA是一个动态的多智能体系统框架，具有前端和后端服务支持。
 
-## 项目结构
-```
-src/
-├── MultA/
-│   ├── __init__.py
-│   ├── MultA.py
-│   └── types.py
-├── backend/
-│   ├── __init__.py
-│   └── main.py
-├── frontend/
-│   ├── __init__.py
-│   └── app.py
-├── run_backend.py
-└── run_frontend.py
-```
 
 ## 安装
 
