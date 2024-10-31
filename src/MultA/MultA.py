@@ -57,6 +57,16 @@ class MultA:
 
     async def run(self, query: str, agents=None, tools=None) -> AsyncGenerator[str, None]:
         await self.init_tools(agents=agents, tools=tools)
+        use_query_rewrite = False
+        if use_query_rewrite:
+            query_augment = f"你是一个用户query理解专家，能够清晰的了解用户query表达的需求，并且能够将用户的query转换为更为清晰、简洁、明确的query。\n\n用户的输入问题为：{query}" + "。请直接给出你修改后的query，格式为{'modified_query': 'xxxx'}，不需要解释。"
+            response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role":"user", "content":query_augment}],
+                )
+            print("response.choices[0].message.content", response.choices[0].message.content)
+            query = json.loads(response.choices[0].message.content.replace("```json", "").replace("```", "").replace("'", '"'))['modified_query']
+        print("query:", query)
         messages = [{
             "role": "system",
             "content":"""你们是一位专业的人工智能助手团队，你们可以通过分工合作完美的解决问题，并且会一步一步解释你们的推理。你们会按照指示一步步思考，从头开始分解问题,并分步协作回答。拆解的每个单独的步骤会由一个人来做出回复，并且当前问题是否需要继续采取后续步骤由正在执行的人分析问题和已经完成的步骤来决定，而不是在一开始的时候就规划好所有步骤，而是走一步规划一步，后续的步骤可以对前面已经执行的步骤进行反驳和纠正下一步执行。
@@ -77,26 +87,44 @@ class MultA:
             next_agent = self.agent_function_mapping[next_agent_name]['object']
             next_type = self.agent_function_mapping[next_agent_name]['type']
             times = 0
-            past_title_set = set("")
+            past_title = ""
             query_set = set(query)
             while times < 5 and next_agent is not None:
+                past_title_set = set(past_title)
                 title_set = set(title)
                 print("past_title_set", past_title_set)
                 print("query_set", query_set)
-                print("title_set", title_set)
+                print("title_set", title_set, title)
                 print(len(title_set & past_title_set),  len(title_set & query_set), len(title_set))
-                if len(title_set & past_title_set) / len(title_set) >= 0.8:
-                    break
-                if len(title_set & query_set) / len(title_set) <= 0.5:
-                    break
-                past_title_set = title_set
+                if times > 0:
+                    if len(title_set & past_title_set) / len(title_set) > 0.68:
+                        response = await self.client.chat.completions.create(
+                                model=self.model,
+                                messages=[{"role":"user", "content":f"请判断“{past_title}”和“{title}”是不是相同的意思。相同返回“TRUE”， 不相同返回“FALSE”，不要返回其他内容。"}] 
+                            )
+                        print("当前问题与上一个问题字符相似度太高。")
+                        if "TRUE" in response.choices[0].message.content:
+                            print("当前问题与上一个问题字符相似度太高。")
+                            break
+                    if len(title_set & query_set) / len(title_set) < 0.5:
+                        if len(title_set & query_set) / len(title_set) < 0.3:
+                            break
+                        response = await self.client.chat.completions.create(
+                                model=self.model,
+                                messages=[{"role":"user", "content":f"请判断步骤“{title}”是不是解决“{query}”的必要步骤。是必要步骤返回“TRUE”， 不是返回“FALSE”，不要返回其他内容。"}] 
+                            )
+                        print("当前问题与query字符相似度太低。")
+                        if "FALSE" in response.choices[0].message.content:
+                            print("当前问题与query字符相似度太低。")
+                            break
+                past_title = title
                 yield f"#### step {times+1}: {title}({next_agent_name})\n\n"
                 await asyncio.sleep(0.1)
                 if next_type == "agent":
                     cur_result, next_agent_name, next_agent_params, title, query_state = await next_agent.run(
                         prompt=next_agent_params['prompt'], 
                         messages=messages, 
-                        tools=self.tools
+                        tools=self.tools,
                     )
                     if len(cur_result) == 0:
                         break
@@ -151,8 +179,8 @@ class MultA:
         约束：
         1. 步骤切分要足够的小，这个小步骤仅由团队中的一个人或一个工具解决，不能是需要多人协作或者多个工具才能解决的步骤。如：“写一篇博客并发表到小红书”需要拆分成“写一篇博客”和“发表到小红书”两个步骤。 
         2. 每个步骤都需要来自用户的初始问题，不需要自行扩展。如：“写一篇博客并发表到小红书”可以拆分成“写一篇博客”和“发表到小红书”两个步骤，一定不要涉及用户query之外的步骤。
-        3. 每个任务都是从用户query中解析得到，不能是捏造的任务。
-        4. 注意LLM本身的幻觉，不要生成用户问题之外的步骤。"""}
+        3. 任务的title要简介明了，并且title的字符要有一半以上来自于用户query中的字符。
+        4. 仅从用户query中拆分步骤，不要增加额外的分析步骤。如果你分析的步骤超出了用户query表达的内容，用户会给你差评，请仔细阅读用户的query之后决定下一步骤是什么。"""}
 
         if self.client_flag == "async":
             response = await self.client.chat.completions.create(

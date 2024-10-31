@@ -27,12 +27,7 @@ class Agent:
                 "step_title": "对内容做摘要",
                 "query_state": "continue/finished"
             }
-        其中step_result为当前步骤处理后的结果，step_title为给当前步骤起的标题，query_state为当前查询处理的状态，finished表示当前步骤是解决用户任务的最后一个步骤，continue表示当前步骤执行完毕后还需要采取后续的步骤继续处理。
-        约束：
-        1. 步骤切分要足够的小，这个小步骤仅由团队中的一个人或一个工具解决，不能是需要多人协作或者多个工具才能解决的步骤。如：“写一篇博客并发表到小红书”需要拆分成“写一篇博客”和“发表到小红书”两个步骤。 
-        2. 每个步骤都需要来自用户的初始问题，不需要自行扩展。如：“写一篇博客并发表到小红书”可以拆分成“写一篇博客”和“发表到小红书”两个步骤，一定不要涉及用户query之外的步骤。
-        3. 每个任务都是从用户query中解析得到，不能是捏造的任务。
-        4. 注意LLM本身的幻觉，不要生成用户问题之外的步骤。"""}
+        其中step_result为当前步骤处理后的结果，step_title为给当前步骤起的标题，query_state为当前查询处理的状态，finished表示当前步骤是解决用户任务的最后一个步骤，continue表示当前步骤执行完毕后还需要采取后续的步骤继续处理。"""}
         if self.client_flag == "async":
             cur_response = await self.client.chat.completions.create(
                 model=self.model,
@@ -64,7 +59,12 @@ class Agent:
                 "step_title": "相关内容检索",
                 "query_state": "continue/finished"
             }
-        其中step_content为当前步骤需要处理的任务，step_title为给当前步骤起的标题，query_state为当前查询处理的状态，finished表示当前步骤是解决用户任务的最后一个步骤，continue表示当前步骤执行完毕后还需要采取后续的步骤继续处理。"""}
+        其中step_content为当前步骤需要处理的任务，step_title为给当前步骤起的标题，query_state为当前查询处理的状态，finished表示当前步骤是解决用户任务的最后一个步骤，continue表示当前步骤执行完毕后还需要采取后续的步骤继续处理。        
+        约束：
+        1. 步骤切分要足够的小，这个小步骤仅由团队中的一个人或一个工具解决，不能是需要多人协作或者多个工具才能解决的步骤。如：“写一篇博客并发表到小红书”需要拆分成“写一篇博客”和“发表到小红书”两个步骤。 
+        2. 每个步骤都需要来自用户的初始问题，不需要自行扩展。如：“写一篇博客并发表到小红书”可以拆分成“写一篇博客”和“发表到小红书”两个步骤，一定不要涉及用户query之外的步骤。
+        3. 任务的title要简介明了，并且title的字符要有一半以上来自于用户query中的字符。
+        4. 仅从用户query中拆分步骤，不要增加额外的分析步骤。如果你分析的步骤超出了用户query表达的内容，用户会给你差评，请仔细阅读用户的query之后决定下一步骤是什么。"""}
             if self.client_flag == "async":
                 response = await self.client.chat.completions.create(
                     tools=tools,

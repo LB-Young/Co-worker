@@ -33,8 +33,8 @@ async def stream_generator(query: str):
     multa = MultA(model="deepseek-chat", client=client)
 
     try:
-        # async for chunk in multa._execute_plan(query, agents=[write_poetry, poetry_review], tools=[get_weather]):
-        async for chunk in multa._execute_plan(query, agents=[financial_specialist, marketer, development_engineer, designer, product_manager], tools=None):   
+        async for chunk in multa._execute_plan(query, agents=[write_poetry, poetry_review, financial_specialist, marketer, development_engineer, designer, product_manager], tools=[get_weather]):
+        # async for chunk in multa._execute_plan(query, agents=[financial_specialist, marketer, development_engineer, designer, product_manager], tools=None):   
             if chunk:  # 确保chunk不为空
                 print("chunk:", chunk)
                 if chunk.strip() == "done!":
