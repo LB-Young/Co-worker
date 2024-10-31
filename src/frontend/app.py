@@ -143,7 +143,7 @@ async def main():
                             for data in cur_response_data:
                                 full_response += data
                                 message_placeholder.markdown(full_response + "▌")
-                                await asyncio.sleep(0.05)
+                                await asyncio.sleep(0.02)
                             if not cur_response_data.strip().startswith("#### step"):
                                 tmp_response = full_response + "[正在思考下一步...]"
                                 message_placeholder.markdown(tmp_response + "▌")
