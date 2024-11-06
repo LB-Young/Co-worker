@@ -6,7 +6,8 @@ client = AsyncOpenAI(
 )
 
 write_poetry = Agent("write_poetry", client, "deepseek-chat", "你是一个诗人可以根据特定的主题写诗,包括四言绝句，八言律诗等", "你是一个诗人可以根据特定的主题写诗,包括四言绝句，八言律诗等", ["write_poetry"])
-poetry_review = Agent("poetry_review", client, "deepseek-chat", "你是一个古诗专家，可以评价古诗词，并给出详细的评价。", "你是一个古诗专家，可以评价古诗词，并给出详细的评价。",["poetry_review"])
+poetry_review = Agent("poetry_review", client, "deepseek-chat", "你是一个评论专家，可以评价古诗词、对联，并给出详细的评价。", "你是一个评论专家，可以评价古诗词、对联，并给出详细的评价。",["poetry_review"])
+write_couplets = Agent("write_couplets", client, "deepseek-chat", "你是一个对联专家，可以根据特定的主题写对联。", "你是一个对联专家，可以根据特定的主题写对联。", ["write_couplets"])
 
 
 financial_specialist_prompt = """

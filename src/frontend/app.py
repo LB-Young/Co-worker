@@ -140,7 +140,7 @@ async def main():
                             if event.data == "[DONE]":
                                 break
                             cur_response_data = event.data.replace("\\n","\n")
-                            for data in cur_response_data:
+                            for index, data in enumerate(cur_response_data):
                                 full_response += data
                                 message_placeholder.markdown(full_response + "▌")
                                 await asyncio.sleep(0.02)

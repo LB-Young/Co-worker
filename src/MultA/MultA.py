@@ -118,7 +118,7 @@ class MultA:
                             print("当前问题与query字符相似度太低。")
                             break
                 past_title = title
-                yield f"#### step {times+1}: {title}({next_agent_name})\n\n"
+                # yield f"#### step {times+1}: {title}({next_agent_name})\n\n"
                 await asyncio.sleep(0.1)
                 if next_type == "agent":
                     cur_result, next_agent_name, next_agent_params, title, query_state = await next_agent.run(
